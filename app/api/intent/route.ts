@@ -1,110 +1,117 @@
-// app/api/intent/route.ts
-// ============================================================
-// JARVIS - Gemini Intent Detection API
-// Security: API key NEVER exposed to frontend
-// Free tier: 15 req/min, 1500 req/day - Gemini 1.5 Flash
-// ============================================================
-
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const SYSTEM_PROMPT = `You are JARVIS - an AI tool selector assistant. 
+const SYSTEM_PROMPT = `You are JARVIS - an AI tool selector assistant.
 Analyze the user's request and return ONLY a JSON object.
 
-Categories available: image, video, writing, code, audio, chat, design, 3d, search, productivity, avatar
+Categories: image, video, writing, code, audio, chat, design, 3d, search, productivity, avatar
 
-Return this exact format:
+Return ONLY this JSON:
 {
-  "intent": "brief-intent-description",
-  "category": "one-of-the-categories-above",
+  "intent": "brief-description",
+  "category": "one-category",
   "confidence": 0.0-1.0,
-  "keywords": ["key1", "key2"]
+  "keywords": ["key1", "key2"],
+  "mode": "tool-finder|chat|code|translate|summary"
 }
 
-Rules:
-- confidence 0.9+ = very clear request
-- confidence 0.7-0.9 = probably clear
-- confidence below 0.7 = use "chat" category
-- Support Hindi/Hinglish input
-- Return ONLY JSON, no explanation`;
+Mode rules:
+- tool-finder: user wants a tool
+- chat: user wants explanation/info
+- code: user wants code written
+- translate: user wants translation
+- summary: user wants something summarized
+
+Support Hindi/Hinglish. Return ONLY JSON.`;
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { input } = body;
+    const { input, context } = body;
 
     if (!input || typeof input !== 'string') {
-      return NextResponse.json(
-        { error: 'Input required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Input required' }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'API key not configured' },
-        { status: 503 }
-      );
+    const contextText = context?.length
+      ? `\n\nConversation context:\n${context.map((m: {role:string, content:string}) =>
+          `${m.role}: ${m.content}`).join('\n')}`
+      : '';
+
+    // TRY GEMINI FIRST
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      try {
+        const genAI = new GoogleGenerativeAI(geminiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const result = await model.generateContent({
+          contents: [{
+            role: 'user',
+            parts: [{ text: `${SYSTEM_PROMPT}${contextText}\n\nUser: "${input}"` }],
+          }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 200, responseMimeType: 'application/json' },
+        });
+
+        const parsed = JSON.parse(result.response.text());
+        const validCats = ['image','video','writing','code','audio','chat','design','3d','search','productivity','avatar'];
+        if (!validCats.includes(parsed.category)) { parsed.category = 'chat'; parsed.confidence = 0.5; }
+
+        return NextResponse.json({
+          intent: parsed.intent || `${parsed.category}-task`,
+          category: parsed.category,
+          confidence: parsed.confidence || 0.7,
+          keywords: parsed.keywords || [],
+          mode: parsed.mode || 'tool-finder',
+          model: 'gemini',
+        });
+      } catch (e) {
+        console.warn('[JARVIS] Gemini failed, trying Groq:', e);
+      }
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    // Use Flash model - free tier, very fast
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // TRY GROQ SECOND
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey) {
+      try {
+        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
+          body: JSON.stringify({
+            model: 'llama3-8b-8192',
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              { role: 'user', content: `${contextText}\n\nUser: "${input}"\n\nReturn ONLY JSON.` }
+            ],
+            temperature: 0.1,
+            max_tokens: 200,
+          }),
+        });
 
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `${SYSTEM_PROMPT}\n\nUser request: "${input}"` }],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.1,       // Low temp for consistent JSON
-        maxOutputTokens: 200,   // Small - we only need a JSON object
-        responseMimeType: 'application/json',
-      },
-    });
-
-    const responseText = result.response.text();
-
-    // Parse and validate JSON
-    let parsed;
-    try {
-      parsed = JSON.parse(responseText);
-    } catch {
-      // Try to extract JSON from response
-      const match = responseText.match(/\{[\s\S]*\}/);
-      if (match) parsed = JSON.parse(match[0]);
-      else throw new Error('Invalid JSON response');
+        const groqData = await groqRes.json();
+        const text = groqData.choices?.[0]?.message?.content || '';
+        const match = text.match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          return NextResponse.json({
+            intent: parsed.intent || `${parsed.category}-task`,
+            category: parsed.category || 'chat',
+            confidence: parsed.confidence || 0.7,
+            keywords: parsed.keywords || [],
+            mode: parsed.mode || 'tool-finder',
+            model: 'groq',
+          });
+        }
+      } catch (e) {
+        console.warn('[JARVIS] Groq failed:', e);
+      }
     }
 
-    // Validate fields
-    const validCategories = ['image', 'video', 'writing', 'code', 'audio', 'chat', 'design', '3d', 'search', 'productivity', 'avatar'];
-    if (!validCategories.includes(parsed.category)) {
-      parsed.category = 'chat';
-      parsed.confidence = 0.5;
-    }
-
-    return NextResponse.json({
-      intent: parsed.intent || `${parsed.category}-task`,
-      category: parsed.category,
-      confidence: parsed.confidence || 0.7,
-      keywords: parsed.keywords || [],
-    });
+    return NextResponse.json({ error: 'All AI unavailable', useKeywordFallback: true }, { status: 503 });
 
   } catch (error) {
     console.error('[JARVIS Intent API] Error:', error);
-
-    // Return graceful error - frontend will use keyword fallback
-    return NextResponse.json(
-      { error: 'Intent detection failed', useKeywordFallback: true },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed', useKeywordFallback: true }, { status: 500 });
   }
 }
 
-// Rate limiting headers
-export const config = {
-  runtime: 'edge',  // Faster, runs on Vercel Edge
-};
+export const config = { runtime: 'edge' };
