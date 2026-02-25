@@ -1,1 +1,174 @@
+/* app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* ─────────────────────────────────────────────
+   JARVIS Design System
+   Theme: Deep dark + Electric Pink
+────────────────────────────────────────────── */
+
+:root {
+  --jarvis-pink: #ff1a88;
+  --jarvis-purple: #8b00ff;
+  --jarvis-dark: #080818;
+  --jarvis-dark-2: #10102a;
+  --jarvis-dark-3: #1a1a3c;
+  --jarvis-dark-4: #2a2a50;
+  --jarvis-text: #e0e0f0;
+  --jarvis-text-dim: #9090b8;
+  --jarvis-border: rgba(255, 26, 136, 0.2);
+  --jarvis-glow: rgba(255, 26, 136, 0.3);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--jarvis-dark-2); }
+::-webkit-scrollbar-thumb { background: var(--jarvis-dark-4); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--jarvis-pink); }
+
+/* Selection */
+::selection { background: rgba(255, 26, 136, 0.3); color: white; }
+
+/* Base */
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--jarvis-dark);
+  color: var(--jarvis-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* ─────────────────────────────────────────────
+   JARVIS Components
+────────────────────────────────────────────── */
+
+/* Glass card effect */
+.jarvis-card {
+  background: rgba(16, 16, 42, 0.8);
+  border: 1px solid var(--jarvis-border);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+.jarvis-card:hover {
+  border-color: rgba(255, 26, 136, 0.4);
+  box-shadow: 0 0 20px var(--jarvis-glow);
+}
+
+/* Glow button */
+.jarvis-btn {
+  background: linear-gradient(135deg, var(--jarvis-pink) 0%, var(--jarvis-purple) 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 10px 20px;
+}
+.jarvis-btn:hover {
+  box-shadow: 0 0 25px var(--jarvis-glow);
+  transform: translateY(-1px);
+}
+.jarvis-btn:active { transform: translateY(0); }
+
+/* Input field */
+.jarvis-input {
+  background: rgba(26, 26, 60, 0.6);
+  border: 1px solid var(--jarvis-border);
+  border-radius: 10px;
+  color: var(--jarvis-text);
+  padding: 12px 16px;
+  outline: none;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+.jarvis-input:focus {
+  border-color: var(--jarvis-pink);
+  box-shadow: 0 0 0 3px rgba(255, 26, 136, 0.15);
+}
+
+/* Pink gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, var(--jarvis-pink) 0%, var(--jarvis-purple) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Typing indicator */
+@keyframes typing-dot {
+  0%, 100% { transform: scale(0.6); opacity: 0.3; }
+  50% { transform: scale(1); opacity: 1; }
+}
+.typing-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--jarvis-pink);
+  animation: typing-dot 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Message animations */
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.message-in { animation: message-in 0.25s ease-out; }
+
+/* Sidebar */
+.sidebar {
+  background: var(--jarvis-dark-2);
+  border-right: 1px solid var(--jarvis-border);
+  height: 100vh;
+  overflow-y: auto;
+}
+
+/* Category tabs */
+.category-tab {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  color: var(--jarvis-text-dim);
+}
+.category-tab:hover {
+  border-color: var(--jarvis-border);
+  color: var(--jarvis-text);
+}
+.category-tab.active {
+  background: rgba(255, 26, 136, 0.15);
+  border-color: rgba(255, 26, 136, 0.4);
+  color: var(--jarvis-pink);
+}
+
+/* Free type badges */
+.badge-free { background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); }
+.badge-freemium { background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3); }
+.badge-limited { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+.badge-credits { background: rgba(168, 85, 247, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sidebar { position: fixed; z-index: 50; width: 80vw; transform: translateX(-100%); transition: transform 0.3s ease; }
+  .sidebar.open { transform: translateX(0); box-shadow: 10px 0 40px rgba(0,0,0,0.5); }
+}
+
+/* Fade overlay for mobile sidebar */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 40;
+}
+@media (max-width: 768px) {
+  .sidebar-overlay.visible { display: block; }
+}
